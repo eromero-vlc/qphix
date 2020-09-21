@@ -111,7 +111,7 @@ void ymeqxSpinor(const FullSpinor<FT,V,S,compress>& x,
 
 // XmyNorm2
 template<typename FT, int V, int S, bool compress>
-void xmy2Norm2Spinor( const FullSpinor<FT,V,S,compress>& x,
+void xmy2Norm2SpinorLocal( const FullSpinor<FT,V,S,compress>& x,
 		FullSpinor<FT,V,S,compress>& y,
 		double &r_norm,
 		const Geometry<FT,V,S,compress>& geom,
@@ -128,14 +128,25 @@ void xmy2Norm2Spinor( const FullSpinor<FT,V,S,compress>& x,
 
 		r_norm += res_cb;
 	}
-	CommsUtils::sumDouble(&r_norm);
+}
 
+template<typename FT, int V, int S, bool compress>
+void xmy2Norm2Spinor( const FullSpinor<FT,V,S,compress>& x,
+		FullSpinor<FT,V,S,compress>& y,
+		double &r_norm,
+		const Geometry<FT,V,S,compress>& geom,
+		int n_blas_simt,
+		const int min_cb=0,
+		const int max_cb=2)
+{
+	xmy2Norm2SpinorLocal<FT,V,S,compress>(x, y, r_norm, geom, n_blas_simt, min_cb, max_cb);
+	CommsUtils::sumDouble(&r_norm);
 }
 
 
 // InnerProduct
 template <typename FT, int V, int S, bool compress>
-void innerProductSpinor(double results[2],
+void innerProductSpinorLocal(double results[2],
 		const FullSpinor<FT,V,S,compress>& x,
 		const FullSpinor<FT,V,S,compress>& y,
 		const Geometry<FT, V, S, compress> &geom,
@@ -161,15 +172,24 @@ void innerProductSpinor(double results[2],
 		results[1] += cb_results[1];
 
 	}
-
-	CommsUtils::sumDoubleArray(results,2);
-
 }
 
+template <typename FT, int V, int S, bool compress>
+void innerProductSpinor(double results[2],
+		const FullSpinor<FT,V,S,compress>& x,
+		const FullSpinor<FT,V,S,compress>& y,
+		const Geometry<FT, V, S, compress> &geom,
+		int n_blas_simt,
+		const int min_cb=0,
+		const int max_cb=2)
+{
+	innerProductSpinorLocal<FT,V,S,compress>(results, x, y, geom, n_blas_simt, min_cb, max_cb);
+	CommsUtils::sumDoubleArray(results,2);
+}
 
 // Norm2
 template<typename FT, int V, int S, bool compress>
-void norm2Spinor(double &n2,
+void norm2SpinorLocal(double &n2,
 		const FullSpinor<FT,V,S,compress>& x,
 		const Geometry<FT, V, S, compress> &geom,
 		int n_blas_simt,
@@ -182,6 +202,17 @@ void norm2Spinor(double &n2,
 		norm2Spinor<FT,V,S,compress>(norm_cb, x.getCBData(cb),geom,n_blas_simt,false );
 		n2 += norm_cb;
 	}
+}
+
+template<typename FT, int V, int S, bool compress>
+void norm2Spinor(double &n2,
+		const FullSpinor<FT,V,S,compress>& x,
+		const Geometry<FT, V, S, compress> &geom,
+		int n_blas_simt,
+		const int min_cb=0,
+		const int max_cb=2)
+{
+	norm2SpinorLocal<FT,V,S,compress>(n2, x, geom, n_blas_simt, min_cb, max_cb);
 	CommsUtils::sumDouble(&n2);
 }
 
