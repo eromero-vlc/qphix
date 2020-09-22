@@ -364,6 +364,8 @@ class Comms
 
   void freeBuffers()
   {
+    if (maxcols_ <= 0) return;
+
     for (int d = 0; d < 4; d++) {
       if (!localDir(d)) {
         ALIGNED_FREE(sendToDir[2 * d + 0]);
