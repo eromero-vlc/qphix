@@ -41,6 +41,13 @@ class Dslash
               int isign,
               int cb);
 
+  void dslash(FourSpinorBlock **res,
+              int ncols,
+              const FourSpinorBlock **psi,
+              const SU3MatrixBlock *u,
+              int isign,
+              int cb);
+
   void dslashAChiMinusBDPsi(FourSpinorBlock *res,
                             const FourSpinorBlock *psi,
                             const FourSpinorBlock *chi,
@@ -121,6 +128,13 @@ class Dslash
             bool const is_plus,
             int cb);
 
+  void DPsi(const SU3MatrixBlock *u,
+            const FourSpinorBlock **psi_in,
+            int ncols,
+            FourSpinorBlock **res_out,
+            bool const is_plus,
+            int cb);
+
   void DPsiDir(const SU3MatrixBlock *u,
              const FourSpinorBlock *psi_in,
              FourSpinorBlock *res_out,
@@ -157,10 +171,31 @@ class Dslash
                    int fb,
                    bool const is_plus);
 
+  void packFaceDir(int tid,
+                   const FourSpinorBlock **psi,
+                   int ncols,
+                   FT *res,
+                   int cb,
+                   int dir,
+                   int fb,
+                   bool const is_plus);
+
+
   //  RECEIVE AND COMPLETE FACE
   void completeFaceDir(int tid,
                        const FT *psi,
                        FourSpinorBlock *res,
+                       const SU3MatrixBlock *u,
+                       const double beta,
+                       int cb,
+                       int dir,
+                       int fb,
+                       bool const is_plus);
+
+  void completeFaceDir(int tid,
+                       const FT *psi,
+                       FourSpinorBlock **res,
+                       int ncols,
                        const SU3MatrixBlock *u,
                        const double beta,
                        int cb,

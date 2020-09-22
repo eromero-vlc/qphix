@@ -346,6 +346,18 @@ void ClovDslash<FT, veclen, soalen, compress12>::dslash(FourSpinorBlock *res,
   DPsi(u, invclov, psi, res, isign == 1, cb);
 }
 
+template <typename FT, int veclen, int soalen, bool compress12>
+void ClovDslash<FT, veclen, soalen, compress12>::dslash(FourSpinorBlock **res,
+                                                        int ncols,
+                                                        const FourSpinorBlock **psi,
+                                                        const SU3MatrixBlock *u,
+                                                        const CloverBlock *invclov,
+                                                        int isign,
+                                                        int cb)
+{
+  DPsi(u, invclov, psi, ncols, res, isign == 1, cb);
+}
+
 // The operator() that the user sees
 template <typename FT, int veclen, int soalen, bool compress12>
 void ClovDslash<FT, veclen, soalen, compress12>::dslashAChiMinusBDPsi(
@@ -359,6 +371,21 @@ void ClovDslash<FT, veclen, soalen, compress12>::dslashAChiMinusBDPsi(
     int cb)
 {
   DPsiAChiMinusBDPsi(u, clov, psi, chi, res, beta, isign == 1, cb);
+}
+
+template <typename FT, int veclen, int soalen, bool compress12>
+void ClovDslash<FT, veclen, soalen, compress12>::dslashAChiMinusBDPsi(
+    FourSpinorBlock **res,
+    int ncols,
+    const FourSpinorBlock **psi,
+    const FourSpinorBlock **chi,
+    const SU3MatrixBlock *u,
+    const CloverBlock *clov,
+    double beta,
+    int isign,
+    int cb)
+{
+  DPsiAChiMinusBDPsi(u, clov, psi, ncols, chi, res, beta, isign == 1, cb);
 }
 
 template <typename FT, int veclen, int soalen, bool compress12>
@@ -1017,6 +1044,18 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
                                                       bool const is_plus,
                                                       int cb)
 {
+  DPsi(u, invclov, &psi_in, 1, &res_out, is_plus, cb);
+}
+
+template <typename FT, int veclen, int soalen, bool compress12>
+void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
+                                                      const CloverBlock *invclov,
+                                                      const FourSpinorBlock **psi_in,
+                                                      int ncols,
+                                                      FourSpinorBlock **res_out,
+                                                      bool const is_plus,
+                                                      int cb)
+{
   double beta_s = aniso_coeff_S;
   double beta_t_f = aniso_coeff_T;
   double beta_t_b = aniso_coeff_T;
@@ -1035,6 +1074,7 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
 #ifdef QPHIX_DO_COMMS
   // Pre-initiate all receives
 
+  comms->setNCol(ncols);
   for (int d = 3; d >= 0; d--) {
     if (!comms->localDir(d)) {
       comms->startRecvFromDir(2 * d + 0);
@@ -1044,8 +1084,8 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
       {
         int tid = omp_get_thread_num();
 
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
       }
       comms->startSendDir(2 * d + 1);
       comms->startSendDir(2 * d + 0);
@@ -1060,7 +1100,8 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
   {
     int tid = omp_get_thread_num();
     // This will deal with anisotropy and boundaries internally
-    Dyz(tid, psi_in, res_out, u, invclov, is_plus, cb);
+    for (int i=0; i<ncols; i++)
+      Dyz(tid, psi_in[i], res_out[i], u, invclov, is_plus, cb);
   }
 
 #ifdef QPHIX_DO_COMMS
@@ -1075,7 +1116,7 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
         double bet = (d / 2 == 3 ? (d % 2 == 0 ? beta_t_b : beta_t_f) : beta_s);
         completeFaceDir(tid,
                         comms->recvFromDir[d],
-                        res_out,
+                        res_out, ncols,
                         u,
                         invclov,
                         bet,
@@ -1102,6 +1143,21 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
     bool const is_plus,
     int cb)
 {
+  DPsiAChiMinusBDPsi(u, clov, &psi_in, 1, &chi_in, &res_out, beta, is_plus, cb);
+}
+
+template <typename FT, int veclen, int soalen, bool compress12>
+void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
+    const SU3MatrixBlock *u,
+    const CloverBlock *clov,
+    const FourSpinorBlock **psi_in,
+    int ncols,
+    const FourSpinorBlock **chi_in,
+    FourSpinorBlock **res_out,
+    double beta,
+    bool const is_plus,
+    int cb)
+{
   double beta_s = beta * aniso_coeff_S;
   double beta_t_f = beta * aniso_coeff_T;
   double beta_t_b = beta * aniso_coeff_T;
@@ -1115,6 +1171,7 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
 #ifdef QPHIX_DO_COMMS
   // Pre-initiate all receives
 
+  comms->setNCol(ncols);
   for (int d = 3; d >= 0; d--) {
     if (!comms->localDir(d)) {
       comms->startRecvFromDir(2 * d + 0);
@@ -1124,8 +1181,8 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
       {
         int tid = omp_get_thread_num();
 
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
       }
       comms->startSendDir(2 * d + 1);
       comms->startSendDir(2 * d + 0);
@@ -1138,7 +1195,8 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
 #pragma omp parallel
   {
     int tid = omp_get_thread_num();
-    DyzAChiMinusBDPsi(tid, psi_in, chi_in, res_out, u, clov, beta, is_plus, cb);
+    for (int i=0; i<ncols; i++)
+      DyzAChiMinusBDPsi(tid, psi_in[i], chi_in[i], res_out[i], u, clov, beta, is_plus, cb);
   }
 
 #ifdef QPHIX_DO_COMMS
@@ -1152,7 +1210,7 @@ void ClovDslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
 
         double bet = (d / 2 == 3 ? (d % 2 == 0 ? beta_t_b : beta_t_f) : beta_s);
         completeFaceDirAChiMBDPsi(
-            tid, comms->recvFromDir[d], res_out, u, bet, cb, d / 2, d % 2, is_plus);
+            tid, comms->recvFromDir[d], res_out, ncols, u, bet, cb, d / 2, d % 2, is_plus);
       }
     } else
       comms->recv_queue.push(d);

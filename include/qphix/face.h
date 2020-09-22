@@ -6,6 +6,20 @@ namespace QPhiX
 // (1 + gamma_T) dagger psi
 template <typename FT, int veclen, int soalen, bool compress>
 void Dslash<FT, veclen, soalen, compress>::packFaceDir(int tid,
+                                                       const FourSpinorBlock **psi,
+                                                       int ncols,
+                                                       FT *res,
+                                                       int cb,
+                                                       int dir,
+                                                       int fb,
+                                                       bool const is_plus)
+{
+  for (int i=0; i<ncols; i++)
+    packFaceDir(tid, psi[i], res + comms->faceInBytes[dir]/sizeof(FT) * i, cb, dir, fb, is_plus);
+}
+
+template <typename FT, int veclen, int soalen, bool compress>
+void Dslash<FT, veclen, soalen, compress>::packFaceDir(int tid,
                                                        const FourSpinorBlock *psi,
                                                        FT *res,
                                                        int cb,
@@ -160,6 +174,22 @@ void Dslash<FT, veclen, soalen, compress>::packFaceDir(int tid,
 
 // Accumulate received back T face (made by packTFaceForwPlus)
 // Recons_add ( 1 + gamma_T )
+template <typename FT, int veclen, int soalen, bool compress>
+void Dslash<FT, veclen, soalen, compress>::completeFaceDir(int tid,
+                                                           const FT *psi,
+                                                           FourSpinorBlock **res,
+                                                           int ncols,
+                                                           const SU3MatrixBlock *u,
+                                                           const double beta,
+                                                           int cb,
+                                                           int dir,
+                                                           int fb,
+                                                           bool const is_plus)
+{
+  for (int i=0; i<ncols; i++)
+    completeFaceDir(tid, psi + comms->faceInBytes[dir]/sizeof(FT) * i, res[i], u, beta, cb, dir, fb, is_plus);
+}
+
 template <typename FT, int veclen, int soalen, bool compress>
 void Dslash<FT, veclen, soalen, compress>::completeFaceDir(int tid,
                                                            const FT *psi,

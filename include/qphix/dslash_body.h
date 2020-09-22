@@ -343,7 +343,19 @@ void Dslash<FT, veclen, soalen, compress12>::dslash(
     int isign,
     int cb)
 {
-  DPsi(u, psi, res, isign == 1, cb);
+  DPsi(u, &psi, 1, &res, isign == 1, cb);
+}
+
+template <typename FT, int veclen, int soalen, bool compress12>
+void Dslash<FT, veclen, soalen, compress12>::dslash(
+    FourSpinorBlock **res,
+    int ncols,
+    const FourSpinorBlock **psi,
+    const SU3MatrixBlock *u, /* Gauge field suitably packed */
+    int isign,
+    int cb)
+{
+  DPsi(u, psi, ncols, res, isign == 1, cb);
 }
 
 template<typename FT, int veclen, int soalen, bool compress12>
@@ -1009,6 +1021,17 @@ void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
                                                   bool const is_plus,
                                                   int cb)
 {
+  DPsi(u, &psi_in, 1, &res_out, is_plus, cb);
+}
+
+template <typename FT, int veclen, int soalen, bool compress12>
+void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
+                                                  const FourSpinorBlock **psi_in,
+                                                  int ncols,
+                                                  FourSpinorBlock **res_out,
+                                                  bool const is_plus,
+                                                  int cb)
+{
   double beta_s = -aniso_coeff_S;
   double beta_t_f = -aniso_coeff_T;
   double beta_t_b = -aniso_coeff_T;
@@ -1027,6 +1050,7 @@ void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
 #ifdef QPHIX_DO_COMMS
   // Pre-initiate all receives
 
+  comms->setNCol(ncols);
   for (int d = 3; d >= 0; d--) {
     if (!comms->localDir(d)) {
       comms->startRecvFromDir(2 * d + 0);
@@ -1035,8 +1059,8 @@ void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
 #pragma omp parallel
       {
         int tid = omp_get_thread_num();
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
-        packFaceDir(tid, psi_in, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 1], cb, d, 1, is_plus);
+        packFaceDir(tid, psi_in, ncols, comms->sendToDir[2 * d + 0], cb, d, 0, is_plus);
       }
       comms->startSendDir(2 * d + 1);
       comms->startSendDir(2 * d + 0);
@@ -1050,7 +1074,8 @@ void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
 #pragma omp parallel
   {
     int tid = omp_get_thread_num();
-    Dyz(tid, psi_in, res_out, u, is_plus, cb, dir_mask);
+    for (int i=0; i<ncols; i++)
+      Dyz(tid, psi_in[i], res_out[i], u, is_plus, cb, dir_mask);
   }
 
 #ifdef QPHIX_DO_COMMS
@@ -1064,7 +1089,7 @@ void Dslash<FT, veclen, soalen, compress12>::DPsi(const SU3MatrixBlock *u,
 
         double bet = (d / 2 == 3 ? (d % 2 == 0 ? beta_t_b : beta_t_f) : beta_s);
         completeFaceDir(
-            tid, comms->recvFromDir[d], res_out, u, bet, cb, d / 2, d % 2, is_plus);
+            tid, comms->recvFromDir[d], res_out, ncols, u, bet, cb, d / 2, d % 2, is_plus);
       }
     } else
       comms->recv_queue.push(d);
@@ -1108,6 +1133,7 @@ void Dslash<FT, veclen, soalen, compress12>::DPsiDir(const SU3MatrixBlock *u,
   // Pre-initiate all receives
 
 
+  comms->setNCol(1);
   if (!comms->localDir(mu)) {
       comms->startRecvFromDir(2*mu + recv_from); // receive from forward
 
@@ -1184,6 +1210,7 @@ void Dslash<FT, veclen, soalen, compress12>::DPsiAChiMinusBDPsi(
 #ifdef QPHIX_DO_COMMS
   // Pre-initiate all receives
 
+  comms->setNCol(1);
   for (int d = 3; d >= 0; d--) {
     if (!comms->localDir(d)) {
       comms->startRecvFromDir(2 * d + 0);

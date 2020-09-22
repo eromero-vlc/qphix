@@ -3,6 +3,21 @@
 namespace QPhiX
 {
 
+template <typename FT, int veclen, int soalen, bool compress>
+void ClovDslash<FT, veclen, soalen, compress>::packFaceDir(
+    int tid,
+    const FourSpinorBlock **psi,
+    int ncols,
+    FT *res,
+    int cb,
+    int dir,
+    int fb,
+    bool const is_plus)
+{
+  for (int i=0; i<ncols; i++)
+    packFaceDir(tid, psi[i], res + comms->faceInBytes[dir]/sizeof(FT) * i, cb, dir, fb, is_plus);
+}
+
 // File scope...
 // (1 + gamma_T) dagger psi
 template <typename FT, int veclen, int soalen, bool compress>
@@ -158,6 +173,24 @@ void ClovDslash<FT, veclen, soalen, compress>::packFaceDir(
       face_proj_dir_minus<FT, veclen, soalen, compress>(
           xyBase, offs, si_offset, outbuf, hsprefdist, mask, dir * 2 + fb);
   }
+}
+
+template <typename FT, int veclen, int soalen, bool compress>
+void ClovDslash<FT, veclen, soalen, compress>::completeFaceDir(
+    int tid,
+    const FT *psi,
+    FourSpinorBlock **res,
+    int ncols,
+    const SU3MatrixBlock *u,
+    const CloverBlock *invclov,
+    const double beta,
+    int cb,
+    int dir,
+    int fb,
+    bool const is_plus)
+{
+  for (int i=0; i<ncols; i++)
+    completeFaceDir(tid, psi + comms->faceInBytes[dir]/sizeof(FT) * i, res[i], u, invclov, beta, cb, dir, fb, is_plus);
 }
 
 //  RECEIVE AND COMPLETE T-FACE FROM FORWARD
@@ -351,6 +384,23 @@ void ClovDslash<FT, veclen, soalen, compress>::completeFaceDir(
            tbc_phases);
   }
 } // Function
+
+template <typename FT, int veclen, int soalen, bool compress>
+void ClovDslash<FT, veclen, soalen, compress>::completeFaceDirAChiMBDPsi(
+    int tid,
+    const FT *psi,
+    FourSpinorBlock **res,
+    int ncols,
+    const SU3MatrixBlock *u,
+    const double beta,
+    int cb,
+    int dir,
+    int fb,
+    bool const is_plus)
+{
+  for (int i=0; i<ncols; i++)
+    completeFaceDirAChiMBDPsi(tid, psi + comms->faceInBytes[dir]/sizeof(FT) * i, res[i], u, beta, cb, dir, fb, is_plus);
+}
 
 // Accumulate received back T face (made by packTFaceForwPlus)
 // Recons_add ( 1 + gamma_T )

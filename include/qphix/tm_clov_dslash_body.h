@@ -1053,6 +1053,7 @@ void TMClovDslash<FT, veclen, soalen, compress12>::DPsi(
 #ifdef QPHIX_DO_COMMS
   // Pre-initiate all receives
 
+  comms->setNCol(1);
   for (int d = 3; d >= 0; d--) {
     if (!comms->localDir(d)) {
       comms->startRecvFromDir(2 * d + 0);

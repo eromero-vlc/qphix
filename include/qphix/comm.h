@@ -225,6 +225,8 @@ class Comms
  public:
   Comms(Geometry<T, V, S, compressP> *geom)
   {
+    maxcols_ = numcols_ = 0;
+
     // Deal with the faces
     NFaceDir[0] = (geom->Ny() * geom->Nz() * geom->Nt()) / 2;
     NFaceDir[1] = (geom->Nx() * geom->Nz() * geom->Nt()) / 2;
@@ -278,54 +280,7 @@ class Comms
     }
     totalBufSize *= 4; // 2 bufs for sends & 2 for recvs
 
-    for (int d = 0; d < 4; d++) {
-      if (!localDir(d)) {
-        sendToDir[2 * d + 0] = (T *)ALIGNED_MALLOC(faceInBytes[d], 4096);
-        sendToDir[2 * d + 1] = (T *)ALIGNED_MALLOC(faceInBytes[d], 4096);
-        recvFromDir[2 * d + 0] = (T *)ALIGNED_MALLOC(faceInBytes[d], 4096);
-        recvFromDir[2 * d + 1] = (T *)ALIGNED_MALLOC(faceInBytes[d], 4096);
-
-#ifndef QPHIX_MPI_COMMS_CALLS
-        msgmem_sendToDir[2 * d + 0] =
-            QMP_declare_msgmem(sendToDir[2 * d + 0], faceInBytes[d]);
-        msgmem_sendToDir[2 * d + 1] =
-            QMP_declare_msgmem(sendToDir[2 * d + 1], faceInBytes[d]);
-        msgmem_recvFromDir[2 * d + 0] =
-            QMP_declare_msgmem(recvFromDir[2 * d + 0], faceInBytes[d]);
-        msgmem_recvFromDir[2 * d + 1] =
-            QMP_declare_msgmem(recvFromDir[2 * d + 1], faceInBytes[d]);
-
-        mh_sendToDir[2 * d + 1] = QMP_declare_send_to(
-            msgmem_sendToDir[2 * d + 1], myNeighboursInDir[2 * d + 1], 0);
-        mh_recvFromDir[2 * d + 0] = QMP_declare_receive_from(
-            msgmem_recvFromDir[2 * d + 0], myNeighboursInDir[2 * d + 0], 0);
-        mh_sendToDir[2 * d + 0] = QMP_declare_send_to(
-            msgmem_sendToDir[2 * d + 0], myNeighboursInDir[2 * d + 0], 0);
-        mh_recvFromDir[2 * d + 1] = QMP_declare_receive_from(
-            msgmem_recvFromDir[2 * d + 1], myNeighboursInDir[2 * d + 1], 0);
-#endif
-      } else {
-        sendToDir[2 * d + 0] = NULL;
-        sendToDir[2 * d + 1] = NULL;
-        recvFromDir[2 * d + 0] = NULL;
-        recvFromDir[2 * d + 1] = NULL;
-#ifndef QPHIX_MPI_COMMS_CALLS
-        msgmem_sendToDir[2 * d + 0] = NULL;
-        msgmem_sendToDir[2 * d + 1] = NULL;
-        msgmem_recvFromDir[2 * d + 0] = NULL;
-        msgmem_recvFromDir[2 * d + 1] = NULL;
-
-        mh_sendToDir[2 * d + 1] = NULL;
-        mh_recvFromDir[2 * d + 0] = NULL;
-        mh_sendToDir[2 * d + 0] = NULL;
-        mh_recvFromDir[2 * d + 1] = NULL;
-#endif
-      }
-#ifdef QPHIX_MPI_COMMS_CALLS
-      reqSendToDir[2 * d + 0] = reqRecvFromDir[2 * d + 0] = MPI_REQUEST_NULL;
-      reqSendToDir[2 * d + 1] = reqRecvFromDir[2 * d + 1] = MPI_REQUEST_NULL;
-#endif
-    } // End loop over dir
+    setNCol(1);
 
     // Determine if I am minimum/maximum in the time direction in the processor grid:
     const int *logical_dimensions = QMP_get_logical_dimensions();
@@ -345,7 +300,69 @@ class Comms
     }
   }
 
-  ~Comms(void)
+  void setNCol(int ncols=1)
+  {
+#ifndef QPHIX_MPI_COMMS_CALLS
+    if (ncols != maxcols_)
+#else
+    if (ncols > maxcols_)
+#endif
+    {
+      freeBuffers();
+      for (int d = 0; d < 4; d++) {
+        if (!localDir(d)) {
+          sendToDir[2 * d + 0] = (T *)ALIGNED_MALLOC(faceInBytes[d]*ncols, 4096);
+          sendToDir[2 * d + 1] = (T *)ALIGNED_MALLOC(faceInBytes[d]*ncols, 4096);
+          recvFromDir[2 * d + 0] = (T *)ALIGNED_MALLOC(faceInBytes[d]*ncols, 4096);
+          recvFromDir[2 * d + 1] = (T *)ALIGNED_MALLOC(faceInBytes[d]*ncols, 4096);
+
+#ifndef QPHIX_MPI_COMMS_CALLS
+          msgmem_sendToDir[2 * d + 0] =
+            QMP_declare_msgmem(sendToDir[2 * d + 0], faceInBytes[d]*ncols);
+          msgmem_sendToDir[2 * d + 1] =
+            QMP_declare_msgmem(sendToDir[2 * d + 1], faceInBytes[d]*ncols);
+          msgmem_recvFromDir[2 * d + 0] =
+            QMP_declare_msgmem(recvFromDir[2 * d + 0], faceInBytes[d]*ncols);
+          msgmem_recvFromDir[2 * d + 1] =
+            QMP_declare_msgmem(recvFromDir[2 * d + 1], faceInBytes[d]*ncols);
+
+          mh_sendToDir[2 * d + 1] = QMP_declare_send_to(
+              msgmem_sendToDir[2 * d + 1], myNeighboursInDir[2 * d + 1], 0);
+          mh_recvFromDir[2 * d + 0] = QMP_declare_receive_from(
+              msgmem_recvFromDir[2 * d + 0], myNeighboursInDir[2 * d + 0], 0);
+          mh_sendToDir[2 * d + 0] = QMP_declare_send_to(
+              msgmem_sendToDir[2 * d + 0], myNeighboursInDir[2 * d + 0], 0);
+          mh_recvFromDir[2 * d + 1] = QMP_declare_receive_from(
+              msgmem_recvFromDir[2 * d + 1], myNeighboursInDir[2 * d + 1], 0);
+#endif
+        } else {
+          sendToDir[2 * d + 0] = NULL;
+          sendToDir[2 * d + 1] = NULL;
+          recvFromDir[2 * d + 0] = NULL;
+          recvFromDir[2 * d + 1] = NULL;
+#ifndef QPHIX_MPI_COMMS_CALLS
+          msgmem_sendToDir[2 * d + 0] = NULL;
+          msgmem_sendToDir[2 * d + 1] = NULL;
+          msgmem_recvFromDir[2 * d + 0] = NULL;
+          msgmem_recvFromDir[2 * d + 1] = NULL;
+
+          mh_sendToDir[2 * d + 1] = NULL;
+          mh_recvFromDir[2 * d + 0] = NULL;
+          mh_sendToDir[2 * d + 0] = NULL;
+          mh_recvFromDir[2 * d + 1] = NULL;
+#endif
+        }
+#ifdef QPHIX_MPI_COMMS_CALLS
+        reqSendToDir[2 * d + 0] = reqRecvFromDir[2 * d + 0] = MPI_REQUEST_NULL;
+        reqSendToDir[2 * d + 1] = reqRecvFromDir[2 * d + 1] = MPI_REQUEST_NULL;
+#endif
+      } // End loop over dir
+      maxcols_ = ncols;
+    }
+    numcols_ = ncols;
+  }
+
+  void freeBuffers()
   {
     for (int d = 0; d < 4; d++) {
       if (!localDir(d)) {
@@ -367,7 +384,10 @@ class Comms
 #endif
       }
     }
+    maxcols_ = 0;
   }
+
+  ~Comms(void) { freeBuffers(); }
 
   inline void startSendDir(int d)
   {
@@ -379,7 +399,7 @@ class Comms
 #else
     /* **** MPI HERE ******* */
     if (MPI_Isend((void *)sendToDir[d],
-                  faceInBytes[d / 2],
+                  faceInBytes[d / 2]*numcols_,
                   MPI_BYTE,
                   myNeighboursInDir[d],
                   QPHIX_DSLASH_MPI_TAG,
@@ -396,7 +416,7 @@ class Comms
            d,
            myRank,
            myNeighboursInDir[d],
-           faceInBytes[d / 2]);
+           faceInBytes[d / 2]*numcols_);
 #endif
   }
 
@@ -408,7 +428,7 @@ class Comms
            d,
            myRank,
            myNeighboursInDir[d],
-           faceInBytes[d / 2]);
+           faceInBytes[d / 2]*numcols_);
 #endif
 
 #ifndef QPHIX_MPI_COMMS_CALLS
@@ -435,7 +455,7 @@ class Comms
     }
 #else
     if (MPI_Irecv((void *)recvFromDir[d],
-                  faceInBytes[d / 2],
+                  faceInBytes[d / 2]*numcols_,
                   MPI_BYTE,
                   myNeighboursInDir[d],
                   QPHIX_DSLASH_MPI_TAG,
@@ -453,7 +473,7 @@ class Comms
            d,
            myNeighboursInDir[d],
            myRank,
-           faceInBytes[d / 2]);
+           faceInBytes[d / 2]*numcols_);
 #endif
   }
 
@@ -466,7 +486,7 @@ class Comms
            d,
            myNeighboursInDir[d],
            myRank,
-           faceInBytes[d / 2]);
+           faceInBytes[d / 2]*numcols_);
 #endif
 
 #ifndef QPHIX_MPI_COMMS_CALLS
@@ -542,12 +562,12 @@ class Comms
   T *recvFromDir[8]; // Recv Buffers
   std::queue<int> recv_queue; // communication queue
 
+  unsigned int faceInBytes[4];
  private:
   // Ranks of the neighbours in the Y, Z and T directions
   int myRank;
   int myNeighboursInDir[8];
 
-  unsigned int faceInBytes[4];
   size_t totalBufSize;
 //  Hack for Karthik here: (Handles for the requests)
 #ifdef QPHIX_MPI_COMMS_CALLS
@@ -570,6 +590,8 @@ class Comms
   bool amIPtMax_;
   int numNonLocalDir_;
   int nonLocalDir_[4];
+  int numcols_; // current number of cols
+  int maxcols_; // allocated number of cols
 };
 
 namespace CommsUtils

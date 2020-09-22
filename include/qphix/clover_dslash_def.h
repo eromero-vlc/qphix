@@ -39,6 +39,14 @@ class ClovDslash
               int isign,
               int cb);
 
+  void dslash(FourSpinorBlock **res,
+              int ncols,
+              const FourSpinorBlock **psi,
+              const SU3MatrixBlock *u,
+              const CloverBlock *invclov,
+              int isign,
+              int cb);
+
   void dslashAChiMinusBDPsi(FourSpinorBlock *res,
                             const FourSpinorBlock *psi,
                             const FourSpinorBlock *chi,
@@ -47,6 +55,17 @@ class ClovDslash
                             const double beta,
                             int isign,
                             int cb);
+
+  void dslashAChiMinusBDPsi(FourSpinorBlock **res,
+                            int ncols,
+                            const FourSpinorBlock **psi,
+                            const FourSpinorBlock **chi,
+                            const SU3MatrixBlock *u,
+                            const CloverBlock *clov,
+                            const double beta,
+                            int isign,
+                            int cb);
+
 
   void clovMult(FourSpinorBlock *res,
 		  const FourSpinorBlock *chi,
@@ -135,6 +154,14 @@ class ClovDslash
             bool const is_plus,
             int cb);
 
+  void DPsi(const SU3MatrixBlock *u,
+            const CloverBlock *invclov,
+            const FourSpinorBlock **psi_in,
+            int ncols,
+            FourSpinorBlock **res_out,
+            bool const is_plus,
+            int cb);
+
   void DPsiAChiMinusBDPsi(const SU3MatrixBlock *u,
                           const CloverBlock *clov,
                           const FourSpinorBlock *psi_in,
@@ -144,9 +171,28 @@ class ClovDslash
                           bool const is_plus,
                           int cb);
 
+  void DPsiAChiMinusBDPsi(const SU3MatrixBlock *u,
+                          const CloverBlock *clov,
+                          const FourSpinorBlock **psi_in,
+                          int ncols,
+                          const FourSpinorBlock **chi,
+                          FourSpinorBlock **res_out,
+                          double beta,
+                          bool const is_plus,
+                          int cb);
+
 #ifdef QPHIX_DO_COMMS
   void packFaceDir(int tid,
                    const FourSpinorBlock *psi,
+                   FT *res,
+                   int cb,
+                   int dir,
+                   int fb,
+                   bool const is_plus);
+
+  void packFaceDir(int tid,
+                   const FourSpinorBlock **psi,
+                   int ncols,
                    FT *res,
                    int cb,
                    int dir,
@@ -164,7 +210,30 @@ class ClovDslash
                        int fb,
                        bool const is_plus);
 
-  void completeFaceDirAChiMBDPsi(int tid,
+   void completeFaceDir(int tid,
+                       const FT *psi,
+                       FourSpinorBlock **res,
+                       int ncols,
+                       const SU3MatrixBlock *u,
+                       const CloverBlock *invclov,
+                       double beta,
+                       int cb,
+                       int dir,
+                       int fb,
+                       bool const is_plus);
+
+ void completeFaceDirAChiMBDPsi(int tid,
+                                 const FT *psi,
+                                 FourSpinorBlock **res,
+                                 int ncols,
+                                 const SU3MatrixBlock *u,
+                                 const double beta,
+                                 int cb,
+                                 int dir,
+                                 int fb,
+                                 bool const is_plus);
+
+ void completeFaceDirAChiMBDPsi(int tid,
                                  const FT *psi,
                                  FourSpinorBlock *res,
                                  const SU3MatrixBlock *u,

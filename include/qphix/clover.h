@@ -60,7 +60,6 @@ public:
     clov[1] = clov_;
     invclov[0] = invclov_even;
     invclov[1] = invclov_odd;
-    tmp = (FourSpinorBlock *)geom.allocCBFourSpinor();
   }
 
   // Constructor
@@ -98,7 +97,6 @@ public:
     clov[1] = clov_[1];
     invclov[0] = invclov_even;
     invclov[1] = invclov_odd;
-    tmp = (FourSpinorBlock *)geom.allocCBFourSpinor();
   }
 
   // FIelds are not set, use set fields later to set them.
@@ -125,7 +123,6 @@ public:
           u({nullptr,nullptr}), clov({nullptr,nullptr}),invclov({nullptr,nullptr})
   {
     Geometry<FT, veclen, soalen, compress12> &geom = D->getGeometry();
-    tmp = (FourSpinorBlock *)geom.allocCBFourSpinor();
   }
 
   // Single Parity of clover is passed
@@ -154,7 +151,7 @@ public:
   ~EvenOddCloverOperator()
   {
     Geometry<FT, veclen, soalen, compress12> &geom = D->getGeometry();
-    geom.free(tmp);
+    for (unsigned int i=0; i<_tmp.size(); i++) geom.free(_tmp[i]);
     delete D;
     delete D_dslash;
   }
@@ -163,12 +160,22 @@ public:
       const FourSpinorBlock *in,
       int isign,
       int target_cb = 1) const override
+   {
+     operator()(&res, 1, &in, isign, target_cb);
+   }
+
+   inline void operator()(FourSpinorBlock **res,
+      int ncols,
+      const FourSpinorBlock **in,
+      int isign,
+      int target_cb = 1) const
       {
     double beta = 0.25;
     int other_cb = 1 - target_cb;
-    D->dslash(tmp, in, u[other_cb], invclov[0], isign, other_cb);
+    FourSpinorBlock **t = tmp(ncols);
+    D->dslash(t, ncols, in, u[other_cb], invclov[0], isign, other_cb);
     D->dslashAChiMinusBDPsi(
-        res, tmp, in, u[target_cb], clov[1], beta, isign, target_cb);
+        res, ncols, (const FourSpinorBlock**)t, in, u[target_cb], clov[1], beta, isign, target_cb);
       }
 
   // Offdiag is just the dslash
@@ -176,10 +183,20 @@ public:
       FourSpinorBlock const *in,
       int isign,
       int target_cb) const override {
+     M_offdiag(&res, 1, (const FourSpinorBlock**)&in, isign, target_cb);
+   }
+
+   inline void M_offdiag(FourSpinorBlock **res,
+      int ncols,
+      const FourSpinorBlock **in,
+      int isign,
+      int target_cb) const {
     Geometry<FT, veclen, soalen, compress12> &geom = D->getGeometry();
     double beta = -0.5;
-    D_dslash->dslash(tmp,in, u[target_cb],isign,target_cb);
-    axy(beta,tmp,res,geom,geom.getNSIMT());
+    FourSpinorBlock **t = tmp(ncols);
+    D_dslash->dslash(t,ncols,in, u[target_cb],isign,target_cb);
+    for (int i=0; i<ncols; i++)
+      axy(beta,t[i],res[i],geom,geom.getNSIMT());
   }
 
   // EE-inv is just the identity (I don't think so)
@@ -256,6 +273,12 @@ public:
     return D->getGeometry();
   }
 
+  FourSpinorBlock** tmp(int ncols=1) const {
+    Geometry<FT, veclen, soalen, compress12> &geom = D->getGeometry();
+    while (_tmp.size() < ncols) _tmp.push_back((FourSpinorBlock *)geom.allocCBFourSpinor());
+    return _tmp.data(); 
+  }
+
 private:
   //double Mass;
   ClovDslash<FT, veclen, soalen, compress12> *D;
@@ -263,6 +286,6 @@ private:
   SU3MatrixBlock *u[2];
   CloverBlock *clov[2];
   CloverBlock *invclov[2];
-  FourSpinorBlock *tmp;
+  mutable std::vector<FourSpinorBlock *> _tmp;
 }; // Class
 }; // Namespace
